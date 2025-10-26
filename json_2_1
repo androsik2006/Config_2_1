@@ -1,0 +1,7 @@
+{
+  "package_name": "Package2_1",
+  "repository_url": "https://gitverse.ru/Androsik/Config-workVerse",
+  "test_repo_mode": "read",
+  "test_repository_mode": false,
+  "max_dependency_depth": 3
+}
