@@ -18,18 +18,17 @@ def get_user_input():
     """
     parser = argparse.ArgumentParser(description='Анализ зависимостей Maven пакетов')
 
-    parser.add_argument('--package', '-p', required=True,
+    parser.add_argument('--package', '-p',
                         help='Имя пакета в формате groupId:artifactId (например: org.springframework:spring-core)')
 
     parser.add_argument('--repository', '-r',
-                        default='https://repo1.maven.org/maven2',
-                        help='URL Maven репозитория (по умолчанию: https://repo1.maven.org/maven2)')
+                        help='URL Maven репозитория')
 
-    parser.add_argument('--depth', '-d', type=int, default=3,
-                        help='Максимальная глубина анализа (по умолчанию: 3)')
+    parser.add_argument('--depth', '-d', type=int,
+                        help='Максимальная глубина анализа')
 
-    parser.add_argument('--config', '-c',
-                        help='Путь к конфигурационному файлу (опционально)')
+    parser.add_argument('--config', '-c', default='config.json',
+                        help='Путь к конфигурационному файлу (по умолчанию: config.json)')
 
     return parser.parse_args()
 
@@ -41,23 +40,60 @@ def load_config_from_file(config_file):
     try:
         with open(config_file, 'r', encoding='utf-8') as f:
             return json.load(f)
+    except FileNotFoundError:
+        print(f"Конфигурационный файл '{config_file}' не найден")
+        return {}
     except Exception as e:
         print(f"Ошибка загрузки конфигурации из файла: {e}")
         return {}
 
 
+def load_config_from_url(config_url):
+    """
+    Загрузка конфигурации из URL
+    """
+    try:
+        print(f"Загрузка конфигурации из URL: {config_url}")
+
+        with urllib.request.urlopen(config_url) as response:
+            content = response.read().decode('utf-8')
+            config_data = json.loads(content)
+
+        print("Конфигурация успешно загружена из URL")
+        return config_data
+
+    except urllib.error.HTTPError as e:
+        print(f"HTTP ошибка при загрузке конфигурации: {e.code} {e.reason}")
+        return {}
+    except urllib.error.URLError as e:
+        print(f"Ошибка сети при загрузке конфигурации: {e.reason}")
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"Ошибка парсинга JSON конфигурации: {e}")
+        return {}
+    except Exception as e:
+        print(f"Неожиданная ошибка при загрузке конфигурации: {e}")
+        return {}
+
+
 def create_configuration(args):
     """
-    Создание конфигурации на основе аргументов командной строки и файла
+    Создание конфигурации на основе аргументов командной строки и файла/URL
     """
     config = {}
 
-    # Загружаем конфигурацию из файла, если указан
+    # Загружаем конфигурацию из файла или URL
     if args.config:
-        file_config = load_config_from_file(args.config)
+        if args.config.startswith('http://') or args.config.startswith('https://'):
+            # Загрузка конфигурации из URL
+            file_config = load_config_from_url(args.config)
+        else:
+            # Загрузка конфигурации из локального файла
+            file_config = load_config_from_file(args.config)
+
         config.update(file_config)
 
-    # Аргументы командной строки имеют приоритет над файлом
+    # Аргументы командной строки имеют приоритет над файлом/URL
     if args.package:
         config['package_name'] = args.package
     if args.repository:
@@ -65,11 +101,16 @@ def create_configuration(args):
     if args.depth:
         config['max_dependency_depth'] = args.depth
 
-    # Устанавливаем значения по умолчанию
+    # Устанавливаем значения по умолчанию, если не заданы
+    if 'package_name' not in config:
+        config['package_name'] = 'org.springframework:spring-core'  # пример по умолчанию
+
     if 'repository_url' not in config:
         config['repository_url'] = 'https://repo1.maven.org/maven2'
+
     if 'max_dependency_depth' not in config:
         config['max_dependency_depth'] = 3
+
     if 'test_repository_mode' not in config:
         config['test_repository_mode'] = False
 
